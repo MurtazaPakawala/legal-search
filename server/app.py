@@ -1,7 +1,7 @@
 import os
 import re
 import time
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -43,6 +43,7 @@ def to_document_summary(document: dict) -> dict:
         "id": document["id"],
         "title": document["title"],
         "sourceUrl": document["sourceUrl"],
+        "hasEnrichment": document.get("enrichment") is not None,
     }
 
 
@@ -69,6 +70,104 @@ def looks_like_plain_text(body: str) -> bool:
     return re.search(r"<html[\s>]", sample, flags=re.IGNORECASE) is None and bool(
         re.search(r"[A-Za-z0-9]", sample)
     )
+
+
+def find_document(document_id: str) -> Optional[dict]:
+    return next((document for document in documents if document["id"] == document_id), None)
+
+
+def span_payload(span: Optional[dict], text: str) -> Optional[dict]:
+    if not span:
+        return None
+
+    start = span.get("start")
+    end = span.get("end")
+    if not isinstance(start, int) or not isinstance(end, int):
+        return span
+
+    return {
+        **span,
+        "text": text[start:end],
+    }
+
+
+def serialize_enrichment_value(value: Any, source_text: str) -> Any:
+    if hasattr(value, "to_dict"):
+        value = value.to_dict(mode="json", exclude_none=False)
+
+    if isinstance(value, list):
+        return [serialize_enrichment_value(item, source_text) for item in value]
+
+    if isinstance(value, dict):
+        if set(value.keys()) == {"start", "end"}:
+            return span_payload(value, source_text)
+
+        return {
+            key: serialize_enrichment_value(item, source_text)
+            for key, item in value.items()
+        }
+
+    return value
+
+
+def has_content(value: Any) -> bool:
+    if value is None:
+        return False
+
+    if isinstance(value, str):
+        return bool(value.strip())
+
+    if isinstance(value, list):
+        return len(value) > 0
+
+    if isinstance(value, dict):
+        return len(value) > 0
+
+    return True
+
+
+def build_document_fields(document: dict) -> list[dict]:
+    enrichment = document.get("enrichment")
+    if not enrichment:
+        return []
+
+    source_text = enrichment["text"]
+    raw_fields = [
+        ("text", "Text", source_text),
+        ("title", "Title", enrichment.get("title")),
+        ("subtitle", "Subtitle", enrichment.get("subtitle")),
+        ("type", "Type", enrichment.get("type")),
+        ("jurisdiction", "Jurisdiction", enrichment.get("jurisdiction")),
+        ("segments", "Segments", enrichment.get("segments")),
+        ("crossreferences", "Crossreferences", enrichment.get("crossreferences")),
+        ("locations", "Locations", enrichment.get("locations")),
+        ("persons", "Persons", enrichment.get("persons")),
+        ("emails", "Emails", enrichment.get("emails")),
+        ("websites", "Websites", enrichment.get("websites")),
+        ("phone_numbers", "Phone Numbers", enrichment.get("phone_numbers")),
+        ("id_numbers", "ID Numbers", enrichment.get("id_numbers")),
+        ("terms", "Terms", enrichment.get("terms")),
+        ("external_documents", "External Documents", enrichment.get("external_documents")),
+        ("quotes", "Quotes", enrichment.get("quotes")),
+        ("dates", "Dates", enrichment.get("dates")),
+        ("headings", "Headings", enrichment.get("headings")),
+        ("junk", "Junk", enrichment.get("junk")),
+        ("version", "Version", enrichment.get("version")),
+    ]
+
+    fields = []
+    for field_id, label, value in raw_fields:
+        serialized = serialize_enrichment_value(value, source_text)
+        fields.append(
+            {
+                "id": field_id,
+                "label": label,
+                "hasValue": has_content(serialized),
+                "value": serialized,
+            }
+        )
+
+    return fields
 
 
 async def fetch_document_text(source_url: str) -> str:
@@ -128,6 +227,18 @@ async def get_documents() -> dict:
     }
 
 
+@app.get("/api/documents/{document_id}")
+async def get_document(document_id: str) -> dict:
+    document = find_document(document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    return {
+        "document": to_document_summary(document),
+        "fields": build_document_fields(document),
+    }
+
+
 @app.post("/api/documents", status_code=201)
 async def create_document(payload: DocumentCreateRequest) -> dict:
     source_url = payload.sourceUrl.strip()
@@ -150,11 +261,28 @@ async def create_document(payload: DocumentCreateRequest) -> dict:
             detail="The fetched URL did not contain enough text to index.",
         )
 
+    if not client:
+        raise HTTPException(
+            status_code=500,
+            detail="ISAACUS_API_KEY is missing. Add it to a local .env file before calling the API.",
+        )
+
+    enrichment_response = client.enrichments.create(
+        model="kanon-2-enricher",
+        texts=text,
+        overflow_strategy="auto",
+    )
+    enriched_document = enrichment_response.results[0].document.to_dict(
+        mode="json",
+        exclude_none=False,
+    )
+
     document = {
         "id": f"linked-{int(time.time() * 1000)}",
         "title": title or extract_title_from_url(source_url),
         "sourceUrl": source_url,
         "text": text,
+        "enrichment": enriched_document,
     }
     documents.insert(0, document)
 
@@ -165,10 +293,7 @@ async def create_document(payload: DocumentCreateRequest) -> dict:
 
 @app.delete("/api/documents/{document_id}", status_code=204)
 async def delete_document(document_id: str) -> None:
-    index: Optional[int] = next(
-        (i for i, document in enumerate(documents) if document["id"] == document_id),
-        None,
-    )
+    index: Optional[int] = next((i for i, document in enumerate(documents) if document["id"] == document_id), None)
     if index is None:
         raise HTTPException(status_code=404, detail="Document not found.")
 

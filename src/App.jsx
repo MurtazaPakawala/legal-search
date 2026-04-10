@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import deleteIcon from './assets/delete.svg';
+import documentIcon from './assets/document.svg';
 import linkIcon from './assets/link-svgrepo-com.svg';
 
 export default function App() {
@@ -11,6 +12,9 @@ export default function App() {
   const [addingDocument, setAddingDocument] = useState(false);
   const [error, setError] = useState('');
   const [documentError, setDocumentError] = useState('');
+  const [detailsError, setDetailsError] = useState('');
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [selectedFieldId, setSelectedFieldId] = useState('');
   const [documentForm, setDocumentForm] = useState({
     title: '',
     sourceUrl: '',
@@ -36,6 +40,32 @@ export default function App() {
     const response = await fetch('/api/documents');
     const data = await response.json();
     setDocuments(data.documents || []);
+  }
+
+  async function openDocumentDetails(documentId) {
+    setDetailsError('');
+
+    try {
+      const response = await fetch(`/api/documents/${documentId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.detail || 'Unable to load document.');
+      }
+
+      const availableFields = (data.fields || []).filter((field) => field.hasValue);
+      setSelectedDocument({
+        ...data.document,
+        fields: availableFields,
+      });
+      setSelectedFieldId(availableFields[0]?.id || '');
+    } catch (requestError) {
+      setDetailsError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to load document.',
+      );
+    }
   }
 
   async function handleSubmit(event) {
@@ -91,6 +121,7 @@ export default function App() {
 
       setDocumentForm({ title: '', sourceUrl: '' });
       await refreshDocuments();
+      await openDocumentDetails(data.document.id);
       setStatus((currentStatus) => ({
         ...currentStatus,
         documentCount: (currentStatus.documentCount || 0) + 1,
@@ -108,6 +139,7 @@ export default function App() {
 
   async function handleDeleteDocument(documentId) {
     setDocumentError('');
+    const wasSelected = selectedDocument?.id === documentId;
 
     try {
       const response = await fetch(`/api/documents/${documentId}`, {
@@ -125,6 +157,10 @@ export default function App() {
       setResults((currentResults) =>
         currentResults.filter((result) => result.id !== documentId),
       );
+      setSelectedDocument((currentDocument) =>
+        currentDocument?.id === documentId ? null : currentDocument,
+      );
+      setSelectedFieldId((currentFieldId) => (wasSelected ? '' : currentFieldId));
       setStatus((currentStatus) => ({
         ...currentStatus,
         documentCount: Math.max((currentStatus.documentCount || 1) - 1, 0),
@@ -136,6 +172,19 @@ export default function App() {
           : 'Unable to delete document.',
       );
     }
+  }
+
+  const activeField =
+    selectedDocument?.fields?.find((field) => field.id === selectedFieldId) || null;
+
+  function renderFieldValue(value) {
+    if (typeof value === 'string') {
+      return <pre className="field-pre">{value}</pre>;
+    }
+
+    return (
+      <pre className="field-pre">{JSON.stringify(value, null, 2)}</pre>
+    );
   }
 
   return (
@@ -151,6 +200,51 @@ export default function App() {
 
       <section className="workspace">
         <section className="panel main-panel">
+          {detailsError ? <p className="error-box">{detailsError}</p> : null}
+
+          <section className="details-panel details-panel-main">
+            <div className="details-head">
+              <h3>Document details</h3>
+              {selectedDocument ? <span>{selectedDocument.title}</span> : null}
+            </div>
+
+            {!selectedDocument ? (
+              <p className="placeholder">
+                Use the document icon to inspect the enriched ILGS fields.
+              </p>
+            ) : (
+              <>
+                <div className="field-tabs">
+                  {selectedDocument.fields.map((field) => (
+                    <button
+                      key={field.id}
+                      type="button"
+                      className={
+                        field.id === selectedFieldId
+                          ? 'field-tab field-tab-active'
+                          : 'field-tab'
+                      }
+                      onClick={() => setSelectedFieldId(field.id)}
+                    >
+                      {field.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="field-viewer field-viewer-large">
+                  {activeField ? (
+                    <>
+                      <h4>{activeField.label}</h4>
+                      {renderFieldValue(activeField.value)}
+                    </>
+                  ) : (
+                    <p className="placeholder">No field data available.</p>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+
           <form className="query-form" onSubmit={handleSubmit}>
             <label htmlFor="query">Query</label>
             <textarea
@@ -273,6 +367,14 @@ export default function App() {
                         >
                           <img src={linkIcon} alt="" />
                         </a>
+                        <button
+                          className="icon-button"
+                          type="button"
+                          onClick={() => openDocumentDetails(document.id)}
+                          aria-label={`Inspect ${document.title}`}
+                        >
+                          <img src={documentIcon} alt="" />
+                        </button>
                         <button
                           className="icon-button icon-button-delete"
                           type="button"
