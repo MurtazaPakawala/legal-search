@@ -188,212 +188,228 @@ export default function App() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="hero">
-        <p className="eyebrow">Isaacus + React</p>
-        <h1>Legal Search (Demo)</h1>
-        <p className="intro">
-          Add document links, review the current file list, then send a legal-style
-          query to the backend and visualize how Isaacus reranks the indexed text.
-        </p>
-      </section>
-
-      <section className="workspace">
-        <section className="panel main-panel">
-          {detailsError ? <p className="error-box">{detailsError}</p> : null}
-
-          <section className="details-panel details-panel-main">
-            <div className="details-head">
-              <h3>Document details</h3>
-              {selectedDocument ? <span>{selectedDocument.title}</span> : null}
-            </div>
-
-            {!selectedDocument ? (
-              <p className="placeholder">
-                Use the document icon to inspect the enriched ILGS fields.
-              </p>
-            ) : (
-              <>
-                <div className="field-tabs">
-                  {selectedDocument.fields.map((field) => (
-                    <button
-                      key={field.id}
-                      type="button"
-                      className={
-                        field.id === selectedFieldId
-                          ? 'field-tab field-tab-active'
-                          : 'field-tab'
-                      }
-                      onClick={() => setSelectedFieldId(field.id)}
-                    >
-                      {field.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="field-viewer field-viewer-large">
-                  {activeField ? (
-                    <>
-                      <h4>{activeField.label}</h4>
-                      {renderFieldValue(activeField.value)}
-                    </>
-                  ) : (
-                    <p className="placeholder">No field data available.</p>
-                  )}
-                </div>
-              </>
-            )}
-          </section>
-
-          <form className="query-form" onSubmit={handleSubmit}>
-            <label htmlFor="query">Query</label>
-            <textarea
-              id="query"
-              rows="4"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Describe what you want to find in the documents"
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? 'Ranking...' : 'Run reranking'}
-            </button>
-          </form>
-
-          <div className="status-row">
-            <span className={status.ok ? 'pill pill-live' : 'pill'}>
-              Backend: {status.ok ? 'online' : 'offline'}
-            </span>
-            <span className={status.hasApiKey ? 'pill pill-live' : 'pill pill-warn'}>
-              API key: {status.hasApiKey ? 'configured' : 'missing'}
-            </span>
-            <span className="pill">Docs: {documents.length}</span>
-          </div>
-
-          {error ? <p className="error-box">{error}</p> : null}
-
-          <div className="results">
-            {results.length === 0 ? (
-              <p className="placeholder">
-                Run the demo to see ranked documents and their scores.
-              </p>
-            ) : (
-              results.map((result) => (
-                <article className="result-card" key={result.id}>
-                  <div className="result-head">
-                    <div className="result-title-row">
-                      <h2>{result.title}</h2>
-                      {result.sourceUrl ? (
-                        <a
-                          className="icon-link"
-                          href={result.sourceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label={`Open ${result.title}`}
-                        >
-                          <img src={linkIcon} alt="" />
-                        </a>
-                      ) : null}
-                    </div>
-                    <strong>{(result.score * 100).toFixed(1)}%</strong>
-                  </div>
-                  <div className="bar-track">
-                    <div
-                      className="bar-fill"
-                      style={{ width: `${Math.max(result.score * 100, 4)}%` }}
-                    />
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
+    <>
+      <main className="app-shell">
+        <section className="hero">
+          <p className="eyebrow">Isaacus + React</p>
+          <h1>Legal Search (Demo)</h1>
+          <p className="intro">
+            Add document links, review the current file list, then send a legal-style
+            query to the backend and visualize how Isaacus reranks the indexed text.
+          </p>
         </section>
 
-        <aside className="sidebar panel">
-          <form className="link-form" onSubmit={handleAddDocument}>
-            <div className="sidebar-head">
-              <h2>Files</h2>
-              <span className="file-count">{documents.length}</span>
+        <section className="workspace">
+          <section className="panel main-panel">
+            {detailsError ? <p className="error-box">{detailsError}</p> : null}
+
+            <form className="query-form" onSubmit={handleSubmit}>
+              <label htmlFor="query">Query</label>
+              <textarea
+                id="query"
+                rows="4"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Describe what you want to find in the documents"
+              />
+              <button type="submit" disabled={loading}>
+                {loading ? 'Ranking...' : 'Run reranking'}
+              </button>
+            </form>
+
+            <div className="status-row">
+              <span className={status.ok ? 'pill pill-live' : 'pill'}>
+                Backend: {status.ok ? 'online' : 'offline'}
+              </span>
+              <span className={status.hasApiKey ? 'pill pill-live' : 'pill pill-warn'}>
+                API key: {status.hasApiKey ? 'configured' : 'missing'}
+              </span>
+              <span className="pill">Docs: {documents.length}</span>
             </div>
 
-            <input
-              id="title"
-              value={documentForm.title}
-              onChange={(event) =>
-                setDocumentForm((current) => ({
-                  ...current,
-                  title: event.target.value,
-                }))
-              }
-              placeholder="Optional title"
-            />
+            {error ? <p className="error-box">{error}</p> : null}
 
-            <input
-              id="sourceUrl"
-              type="url"
-              value={documentForm.sourceUrl}
-              onChange={(event) =>
-                setDocumentForm((current) => ({
-                  ...current,
-                  sourceUrl: event.target.value,
-                }))
-              }
-              placeholder="Paste file link"
-              required
-            />
-
-            <button type="submit" disabled={addingDocument}>
-              {addingDocument ? 'Adding...' : 'Add file'}
-            </button>
-          </form>
-
-          {documentError ? <p className="error-box">{documentError}</p> : null}
-
-          <div className="document-list">
-            {documents.length === 0 ? (
-              <p className="placeholder">No files yet.</p>
-            ) : (
-              documents.map((document) => (
-                <article className="document-item" key={document.id}>
-                  <div className="document-row">
-                    <h3>{document.title}</h3>
-                    {document.sourceUrl ? (
-                      <div className="document-actions">
-                        <a
-                          className="icon-link"
-                          href={document.sourceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label={`Open ${document.title}`}
-                        >
-                          <img src={linkIcon} alt="" />
-                        </a>
-                        <button
-                          className="icon-button"
-                          type="button"
-                          onClick={() => openDocumentDetails(document.id)}
-                          aria-label={`Inspect ${document.title}`}
-                        >
-                          <img src={documentIcon} alt="" />
-                        </button>
-                        <button
-                          className="icon-button icon-button-delete"
-                          type="button"
-                          onClick={() => handleDeleteDocument(document.id)}
-                          aria-label={`Delete ${document.title}`}
-                        >
-                          <img src={deleteIcon} alt="" />
-                        </button>
+            <div className="results">
+              {results.length === 0 ? (
+                <p className="placeholder">
+                  Run the demo to see ranked documents and their scores.
+                </p>
+              ) : (
+                results.map((result) => (
+                  <article className="result-card" key={result.id}>
+                    <div className="result-head">
+                      <div className="result-title-row">
+                        <h2>{result.title}</h2>
+                        {result.sourceUrl ? (
+                          <a
+                            className="icon-link"
+                            href={result.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Open ${result.title}`}
+                          >
+                            <img src={linkIcon} alt="" />
+                          </a>
+                        ) : null}
                       </div>
-                    ) : (
-                      <span className="document-link-muted">Built in</span>
-                    )}
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
-        </aside>
-      </section>
-    </main>
+                      <strong>{(result.score * 100).toFixed(1)}%</strong>
+                    </div>
+                    <div className="bar-track">
+                      <div
+                        className="bar-fill"
+                        style={{ width: `${Math.max(result.score * 100, 4)}%` }}
+                      />
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
+
+          <aside className="sidebar panel">
+            <form className="link-form" onSubmit={handleAddDocument}>
+              <div className="sidebar-head">
+                <h2>Files</h2>
+                <span className="file-count">{documents.length}</span>
+              </div>
+
+              <input
+                id="title"
+                value={documentForm.title}
+                onChange={(event) =>
+                  setDocumentForm((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
+                placeholder="Optional title"
+              />
+
+              <input
+                id="sourceUrl"
+                type="url"
+                value={documentForm.sourceUrl}
+                onChange={(event) =>
+                  setDocumentForm((current) => ({
+                    ...current,
+                    sourceUrl: event.target.value,
+                  }))
+                }
+                placeholder="Paste file link"
+                required
+              />
+
+              <button type="submit" disabled={addingDocument}>
+                {addingDocument ? 'Adding...' : 'Add file'}
+              </button>
+            </form>
+
+            {documentError ? <p className="error-box">{documentError}</p> : null}
+
+            <div className="document-list">
+              {documents.length === 0 ? (
+                <p className="placeholder">No files yet.</p>
+              ) : (
+                documents.map((document) => (
+                  <article className="document-item" key={document.id}>
+                    <div className="document-row">
+                      <h3>{document.title}</h3>
+                      {document.sourceUrl ? (
+                        <div className="document-actions">
+                          <a
+                            className="icon-link"
+                            href={document.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Open ${document.title}`}
+                          >
+                            <img src={linkIcon} alt="" />
+                          </a>
+                          <button
+                            className="icon-button"
+                            type="button"
+                            onClick={() => openDocumentDetails(document.id)}
+                            aria-label={`Inspect ${document.title}`}
+                          >
+                            <img src={documentIcon} alt="" />
+                          </button>
+                          <button
+                            className="icon-button icon-button-delete"
+                            type="button"
+                            onClick={() => handleDeleteDocument(document.id)}
+                            aria-label={`Delete ${document.title}`}
+                          >
+                            <img src={deleteIcon} alt="" />
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </aside>
+        </section>
+      </main>
+
+      {selectedDocument ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => setSelectedDocument(null)}
+          role="presentation"
+        >
+          <section
+            className="details-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="document-details-title"
+          >
+            <div className="details-modal-head">
+              <div className="details-head">
+                <h3 id="document-details-title">Document details</h3>
+                <span>{selectedDocument.title}</span>
+              </div>
+              <button
+                className="modal-close"
+                type="button"
+                onClick={() => setSelectedDocument(null)}
+                aria-label="Close document details"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="field-tabs">
+              {selectedDocument.fields.map((field) => (
+                <button
+                  key={field.id}
+                  type="button"
+                  className={
+                    field.id === selectedFieldId
+                      ? 'field-tab field-tab-active'
+                      : 'field-tab'
+                  }
+                  onClick={() => setSelectedFieldId(field.id)}
+                >
+                  {field.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="field-viewer field-viewer-modal">
+              {activeField ? (
+                <>
+                  <h4>{activeField.label}</h4>
+                  {renderFieldValue(activeField.value)}
+                </>
+              ) : (
+                <p className="placeholder">No field data available.</p>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </>
   );
 }
