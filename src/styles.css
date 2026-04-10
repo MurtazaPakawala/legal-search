@@ -25,19 +25,21 @@ input {
 .app-shell {
   width: min(960px, calc(100% - 32px));
   margin: 0 auto;
+  min-height: 100vh;
   padding: 48px 0 64px;
+  display: flex;
+  flex-direction: column;
 }
 
 .hero {
   margin-bottom: 28px;
 }
 
-.eyebrow {
-  margin: 0 0 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 0.75rem;
-  color: #986a12;
+.hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
 }
 
 h1 {
@@ -47,10 +49,11 @@ h1 {
   max-width: none;
 }
 
-.intro {
-  max-width: 56ch;
-  margin: 16px 0 0;
-  line-height: 1.6;
+.tagline {
+  margin: 10px 0 0;
+  color: rgba(16, 32, 51, 0.72);
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .panel {
@@ -153,10 +156,59 @@ h1 {
   background: rgba(167, 48, 48, 0.12);
 }
 
+.info-button {
+  width: auto;
+  height: 42px;
+  padding: 0 14px;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(16, 32, 51, 0.1);
+}
+
+.info-button span {
+  font-size: 0.95rem;
+}
+
 .icon-link img,
 .icon-button img {
   width: 16px;
   height: 16px;
+}
+
+.info-wrap {
+  position: relative;
+  z-index: 20;
+}
+
+.info-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 220px;
+  z-index: 100;
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(16, 32, 51, 0.08);
+  box-shadow: 0 18px 40px rgba(16, 32, 51, 0.12);
+}
+
+.info-popover p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.info-popover p + p {
+  margin-top: 8px;
+}
+
+.info-popover img {
+  width: 14px;
+  height: 14px;
 }
 
 .main-panel {
@@ -405,6 +457,17 @@ h1 {
   margin-top: 20px;
 }
 
+.app-footer {
+  margin-top: auto;
+  padding-top: 28px;
+  text-align: center;
+}
+
+.app-footer a {
+  color: #8a5610;
+  text-decoration: none;
+}
+
 .placeholder {
   margin: 0;
   color: rgba(16, 32, 51, 0.7);
@@ -459,6 +522,11 @@ h1 {
 
   .panel {
     padding: 18px;
+  }
+
+  .hero-top {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .modal-backdrop {

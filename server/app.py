@@ -25,6 +25,19 @@ app.add_middleware(
 
 documents: list[dict] = []
 
+DEFAULT_DOCUMENTS = [
+    {
+        "id": "default-apple-tos",
+        "title": "apple-tos.txt",
+        "sourceUrl": "https://examples.isaacus.com/apple-tos.txt",
+    },
+    {
+        "id": "default-github-tos",
+        "title": "github-tos.md",
+        "sourceUrl": "https://examples.isaacus.com/github-tos.md",
+    },
+]
+
 api_key = os.getenv("ISAACUS_API_KEY")
 client = Isaacus(api_key=api_key, timeout=20.0) if api_key else None
 
@@ -174,6 +187,23 @@ def build_document_fields(document: dict) -> list[dict]:
     return fields
 
 
+def build_document_record(
+    *,
+    document_id: str,
+    title: str,
+    source_url: str,
+    text: str,
+    enrichment: dict,
+) -> dict:
+    return {
+        "id": document_id,
+        "title": title,
+        "sourceUrl": source_url,
+        "text": text,
+        "enrichment": enrichment,
+    }
+
+
 async def fetch_document_text(source_url: str) -> str:
     async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as http_client:
         response = await http_client.get(source_url)
@@ -215,8 +245,45 @@ async def fetch_document_text(source_url: str) -> str:
     )
 
 
+async def enrich_document_text(text: str) -> dict:
+    if not client:
+        raise HTTPException(
+            status_code=500,
+            detail="ISAACUS_API_KEY is missing. Add it to a local .env file before calling the API.",
+        )
+
+    enrichment_response = client.enrichments.create(
+        model="kanon-2-enricher",
+        texts=text,
+        overflow_strategy="auto",
+    )
+    return enrichment_response.results[0].document.to_dict(
+        mode="json",
+        exclude_none=False,
+    )
+
+
+async def ensure_default_documents() -> None:
+    if documents:
+        return
+
+    for item in DEFAULT_DOCUMENTS:
+        text = await fetch_document_text(item["sourceUrl"])
+        enrichment = await enrich_document_text(text)
+        documents.append(
+            build_document_record(
+                document_id=item["id"],
+                title=item["title"],
+                source_url=item["sourceUrl"],
+                text=text,
+                enrichment=enrichment,
+            )
+        )
+
+
 @app.get("/api/health")
 async def health() -> dict:
+    await ensure_default_documents()
     return {
         "ok": True,
         "hasApiKey": bool(api_key),
@@ -226,6 +293,7 @@ async def health() -> dict:
 
 @app.get("/api/documents")
 async def get_documents() -> dict:
+    await ensure_default_documents()
     return {
         "documents": [to_document_summary(document) for document in documents],
     }
@@ -233,6 +301,7 @@ async def get_documents() -> dict:
 
 @app.get("/api/documents/{document_id}")
 async def get_document(document_id: str) -> dict:
+    await ensure_default_documents()
     document = find_document(document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -245,6 +314,7 @@ async def get_document(document_id: str) -> dict:
 
 @app.post("/api/documents/{document_id}/search")
 async def search_document(document_id: str, payload: DocumentSearchRequest) -> dict:
+    await ensure_default_documents()
     document = find_document(document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -279,6 +349,7 @@ async def search_document(document_id: str, payload: DocumentSearchRequest) -> d
 
 @app.post("/api/documents", status_code=201)
 async def create_document(payload: DocumentCreateRequest) -> dict:
+    await ensure_default_documents()
     source_url = payload.sourceUrl.strip()
     title = payload.title.strip()
 
@@ -299,29 +370,15 @@ async def create_document(payload: DocumentCreateRequest) -> dict:
             detail="The fetched URL did not contain enough text to index.",
         )
 
-    if not client:
-        raise HTTPException(
-            status_code=500,
-            detail="ISAACUS_API_KEY is missing. Add it to a local .env file before calling the API.",
-        )
+    enriched_document = await enrich_document_text(text)
 
-    enrichment_response = client.enrichments.create(
-        model="kanon-2-enricher",
-        texts=text,
-        overflow_strategy="auto",
+    document = build_document_record(
+        document_id=f"linked-{int(time.time() * 1000)}",
+        title=title or extract_title_from_url(source_url),
+        source_url=source_url,
+        text=text,
+        enrichment=enriched_document,
     )
-    enriched_document = enrichment_response.results[0].document.to_dict(
-        mode="json",
-        exclude_none=False,
-    )
-
-    document = {
-        "id": f"linked-{int(time.time() * 1000)}",
-        "title": title or extract_title_from_url(source_url),
-        "sourceUrl": source_url,
-        "text": text,
-        "enrichment": enriched_document,
-    }
     documents.insert(0, document)
 
     return {
@@ -331,6 +388,7 @@ async def create_document(payload: DocumentCreateRequest) -> dict:
 
 @app.delete("/api/documents/{document_id}", status_code=204)
 async def delete_document(document_id: str) -> None:
+    await ensure_default_documents()
     index: Optional[int] = next((i for i, document in enumerate(documents) if document["id"] == document_id), None)
     if index is None:
         raise HTTPException(status_code=404, detail="Document not found.")
@@ -340,6 +398,7 @@ async def delete_document(document_id: str) -> None:
 
 @app.post("/api/rerank")
 async def rerank_documents(payload: RerankRequest) -> dict:
+    await ensure_default_documents()
     query = payload.query.strip()
 
     if not query:

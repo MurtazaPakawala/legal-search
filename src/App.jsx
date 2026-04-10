@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import deleteIcon from './assets/delete.svg';
 import documentIcon from './assets/document.svg';
+import infoIcon from './assets/info-button-svgrepo-com.svg';
 import linkIcon from './assets/link-svgrepo-com.svg';
 import searchIcon from './assets/search-alt-svgrepo-com.svg';
 
@@ -16,6 +17,7 @@ export default function App() {
   const [detailsError, setDetailsError] = useState('');
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedFieldId, setSelectedFieldId] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [documentSearchQuery, setDocumentSearchQuery] = useState('');
   const [documentSearchResult, setDocumentSearchResult] = useState(null);
@@ -24,6 +26,7 @@ export default function App() {
     title: '',
     sourceUrl: '',
   });
+  const infoRef = useRef(null);
 
   useEffect(() => {
     fetch('/api/health')
@@ -41,6 +44,20 @@ export default function App() {
       });
   }, []);
 
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!infoRef.current?.contains(event.target)) {
+        setInfoOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, []);
+
   async function refreshDocuments() {
     const response = await fetch('/api/documents');
     const data = await response.json();
@@ -55,10 +72,14 @@ export default function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.detail || 'Unable to load document.');
+        throw new Error(
+          data.error || data.detail || 'Unable to load document.',
+        );
       }
 
-      const availableFields = (data.fields || []).filter((field) => field.hasValue);
+      const availableFields = (data.fields || []).filter(
+        (field) => field.hasValue,
+      );
       setSelectedDocument({
         ...data.document,
         fields: availableFields,
@@ -99,7 +120,9 @@ export default function App() {
       setResults(data.results);
     } catch (requestError) {
       setError(
-        requestError instanceof Error ? requestError.message : 'Request failed.',
+        requestError instanceof Error
+          ? requestError.message
+          : 'Request failed.',
       );
       setResults([]);
     } finally {
@@ -156,7 +179,9 @@ export default function App() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || data.detail || 'Unable to delete document.');
+        throw new Error(
+          data.error || data.detail || 'Unable to delete document.',
+        );
       }
 
       setDocuments((currentDocuments) =>
@@ -168,7 +193,9 @@ export default function App() {
       setSelectedDocument((currentDocument) =>
         currentDocument?.id === documentId ? null : currentDocument,
       );
-      setSelectedFieldId((currentFieldId) => (wasSelected ? '' : currentFieldId));
+      setSelectedFieldId((currentFieldId) =>
+        wasSelected ? '' : currentFieldId,
+      );
       if (wasSelected) {
         setSearchOpen(false);
         setDocumentSearchQuery('');
@@ -188,16 +215,15 @@ export default function App() {
   }
 
   const activeField =
-    selectedDocument?.fields?.find((field) => field.id === selectedFieldId) || null;
+    selectedDocument?.fields?.find((field) => field.id === selectedFieldId) ||
+    null;
 
   function renderFieldValue(value) {
     if (typeof value === 'string') {
-      return <pre className="field-pre">{value}</pre>;
+      return <pre className='field-pre'>{value}</pre>;
     }
 
-    return (
-      <pre className="field-pre">{JSON.stringify(value, null, 2)}</pre>
-    );
+    return <pre className='field-pre'>{JSON.stringify(value, null, 2)}</pre>;
   }
 
   async function handleDocumentSearch(event) {
@@ -211,18 +237,23 @@ export default function App() {
     setDetailsError('');
 
     try {
-      const response = await fetch(`/api/documents/${selectedDocument.id}/search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `/api/documents/${selectedDocument.id}/search`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query: documentSearchQuery }),
         },
-        body: JSON.stringify({ query: documentSearchQuery }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.detail || 'Unable to search document.');
+        throw new Error(
+          data.error || data.detail || 'Unable to search document.',
+        );
       }
 
       setDocumentSearchResult(data.answer);
@@ -240,92 +271,122 @@ export default function App() {
 
   return (
     <>
-      <main className="app-shell">
-        <section className="hero">
-          <p className="eyebrow">Isaacus + React</p>
-          <h1>Legal Search (Demo)</h1>
-          <p className="intro">
-            Add document links, review the current file list, then send a legal-style
-            query to the backend and visualize how Isaacus reranks the indexed text.
-          </p>
+      <main className='app-shell'>
+        <section className='hero'>
+          <div className='hero-top'>
+            <div>
+              <h1>Legal Search (Demo)</h1>
+              <p className='tagline'>
+                Work with your legal document made easy!!
+              </p>
+            </div>
+
+            <div className='info-wrap' ref={infoRef}>
+              <button
+                className='icon-button info-button'
+                type='button'
+                onClick={() => setInfoOpen((current) => !current)}
+                aria-label='Show icon info'
+              >
+                <span>Info</span>
+                <img src={infoIcon} alt='' />
+              </button>
+
+              {infoOpen ? (
+                <div className='info-popover'>
+                  <p>
+                    <img src={linkIcon} alt='' /> Open file link.
+                  </p>
+                  <p>
+                    <img src={documentIcon} alt='' /> Open document details.
+                  </p>
+                  <p>
+                    <img src={deleteIcon} alt='' /> Delete file.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </section>
 
-        <section className="workspace">
-          <section className="panel main-panel">
-            {detailsError ? <p className="error-box">{detailsError}</p> : null}
+        <section className='workspace'>
+          <section className='panel main-panel'>
+            {detailsError ? <p className='error-box'>{detailsError}</p> : null}
 
-            <form className="query-form" onSubmit={handleSubmit}>
-              <label htmlFor="query">Query</label>
+            <form className='query-form' onSubmit={handleSubmit}>
+              <label htmlFor='query'>Query</label>
               <textarea
-                id="query"
-                rows="4"
+                id='query'
+                rows='4'
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Describe what you want to find in the documents"
+                placeholder='Describe what you want to find in the documents'
               />
-              <button type="submit" disabled={loading}>
+              <button type='submit' disabled={loading}>
                 {loading ? 'Ranking...' : 'Run reranking'}
               </button>
             </form>
 
-            <div className="status-row">
+            <div className='status-row'>
               <span className={status.ok ? 'pill pill-live' : 'pill'}>
                 Backend: {status.ok ? 'online' : 'offline'}
               </span>
-              <span className={status.hasApiKey ? 'pill pill-live' : 'pill pill-warn'}>
+              <span
+                className={
+                  status.hasApiKey ? 'pill pill-live' : 'pill pill-warn'
+                }
+              >
                 API key: {status.hasApiKey ? 'configured' : 'missing'}
               </span>
-              <span className="pill">Docs: {documents.length}</span>
+              <span className='pill'>Docs: {documents.length}</span>
             </div>
 
-            {error ? <p className="error-box">{error}</p> : null}
+            {error ? <p className='error-box'>{error}</p> : null}
 
-            <div className="results">
-              {results.length === 0 ? (
-                <p className="placeholder">
-                  Run the demo to see ranked documents and their scores.
-                </p>
-              ) : (
-                results.map((result) => (
-                  <article className="result-card" key={result.id}>
-                    <div className="result-head">
-                      <div className="result-title-row">
-                        <h2>{result.title}</h2>
-                        {result.sourceUrl ? (
-                          <a
-                            className="icon-link"
-                            href={result.sourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            aria-label={`Open ${result.title}`}
-                          >
-                            <img src={linkIcon} alt="" />
-                          </a>
-                        ) : null}
+            <div className='results'>
+              {results.length === 0
+                ? null
+                : results.map((result) => (
+                    <article className='result-card' key={result.id}>
+                      <div className='result-head'>
+                        <div className='result-title-row'>
+                          <h2>{result.title}</h2>
+                          {result.sourceUrl ? (
+                            <a
+                              className='icon-link'
+                              href={result.sourceUrl}
+                              target='_blank'
+                              rel='noreferrer'
+                              aria-label={`Open ${result.title}`}
+                            >
+                              <img src={linkIcon} alt='' />
+                            </a>
+                          ) : null}
+                        </div>
+                        <strong>{(result.score * 100).toFixed(1)}%</strong>
                       </div>
-                      <strong>{(result.score * 100).toFixed(1)}%</strong>
-                    </div>
-                    <div className="bar-track">
-                      <div
-                        className="bar-fill"
-                        style={{ width: `${Math.max(result.score * 100, 4)}%` }}
-                      />
-                    </div>
-                  </article>
-                ))
-              )}
+                      <div className='bar-track'>
+                        <div
+                          className='bar-fill'
+                          style={{
+                            width: `${Math.max(result.score * 100, 4)}%`,
+                          }}
+                        />
+                      </div>
+                    </article>
+                  ))}
             </div>
           </section>
 
-          <aside className="sidebar panel">
-            <form className="link-form" onSubmit={handleAddDocument}>
-              <div className="sidebar-head">
+          <aside className='sidebar panel'>
+            <form className='link-form' onSubmit={handleAddDocument}>
+              <div className='sidebar-head'>
                 <h2>Files</h2>
-                <span className="file-count">{documents.length}</span>
+                <span className='file-count'>{documents.length}</span>
               </div>
 
               <input
-                id="title"
+                id='title'
                 value={documentForm.title}
                 onChange={(event) =>
                   setDocumentForm((current) => ({
@@ -333,12 +394,12 @@ export default function App() {
                     title: event.target.value,
                   }))
                 }
-                placeholder="Optional title"
+                placeholder='Optional title'
               />
 
               <input
-                id="sourceUrl"
-                type="url"
+                id='sourceUrl'
+                type='url'
                 value={documentForm.sourceUrl}
                 onChange={(event) =>
                   setDocumentForm((current) => ({
@@ -346,51 +407,53 @@ export default function App() {
                     sourceUrl: event.target.value,
                   }))
                 }
-                placeholder="Paste file link"
+                placeholder='Paste file link'
                 required
               />
 
-              <button type="submit" disabled={addingDocument}>
+              <button type='submit' disabled={addingDocument}>
                 {addingDocument ? 'Adding...' : 'Add file'}
               </button>
             </form>
 
-            {documentError ? <p className="error-box">{documentError}</p> : null}
+            {documentError ? (
+              <p className='error-box'>{documentError}</p>
+            ) : null}
 
-            <div className="document-list">
+            <div className='document-list'>
               {documents.length === 0 ? (
-                <p className="placeholder">No files yet.</p>
+                <p className='placeholder'>No files yet.</p>
               ) : (
                 documents.map((document) => (
-                  <article className="document-item" key={document.id}>
-                    <div className="document-row">
+                  <article className='document-item' key={document.id}>
+                    <div className='document-row'>
                       <h3>{document.title}</h3>
                       {document.sourceUrl ? (
-                        <div className="document-actions">
+                        <div className='document-actions'>
                           <a
-                            className="icon-link"
+                            className='icon-link'
                             href={document.sourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
+                            target='_blank'
+                            rel='noreferrer'
                             aria-label={`Open ${document.title}`}
                           >
-                            <img src={linkIcon} alt="" />
+                            <img src={linkIcon} alt='' />
                           </a>
                           <button
-                            className="icon-button"
-                            type="button"
+                            className='icon-button'
+                            type='button'
                             onClick={() => openDocumentDetails(document.id)}
                             aria-label={`Inspect ${document.title}`}
                           >
-                            <img src={documentIcon} alt="" />
+                            <img src={documentIcon} alt='' />
                           </button>
                           <button
-                            className="icon-button icon-button-delete"
-                            type="button"
+                            className='icon-button icon-button-delete'
+                            type='button'
                             onClick={() => handleDeleteDocument(document.id)}
                             aria-label={`Delete ${document.title}`}
                           >
-                            <img src={deleteIcon} alt="" />
+                            <img src={deleteIcon} alt='' />
                           </button>
                         </div>
                       ) : null}
@@ -401,83 +464,95 @@ export default function App() {
             </div>
           </aside>
         </section>
+
+        <footer className='app-footer'>
+          <a
+            href='https://docs.isaacus.com/welcome'
+            target='_blank'
+            rel='noreferrer'
+          >
+            Made with Isaacus
+          </a>
+        </footer>
       </main>
 
       {selectedDocument ? (
         <div
-          className="modal-backdrop"
+          className='modal-backdrop'
           onClick={() => {
             setSelectedDocument(null);
             setSearchOpen(false);
             setDocumentSearchQuery('');
             setDocumentSearchResult(null);
           }}
-          role="presentation"
+          role='presentation'
         >
           <section
-            className="details-modal"
+            className='details-modal'
             onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="document-details-title"
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='document-details-title'
           >
-            <div className="details-modal-head">
-              <div className="details-head">
-                <h3 id="document-details-title">Document details</h3>
+            <div className='details-modal-head'>
+              <div className='details-head'>
+                <h3 id='document-details-title'>Document details</h3>
                 <span>{selectedDocument.title}</span>
               </div>
               <button
-                className="modal-close"
-                type="button"
+                className='modal-close'
+                type='button'
                 onClick={() => {
                   setSelectedDocument(null);
                   setSearchOpen(false);
                   setDocumentSearchQuery('');
                   setDocumentSearchResult(null);
                 }}
-                aria-label="Close document details"
+                aria-label='Close document details'
               >
                 Close
               </button>
             </div>
 
-            <div className="modal-toolbar">
-              <form className="modal-search" onSubmit={handleDocumentSearch}>
+            <div className='modal-toolbar'>
+              <form className='modal-search' onSubmit={handleDocumentSearch}>
                 {searchOpen ? (
                   <>
                     <input
-                      className="modal-search-input"
+                      className='modal-search-input'
                       value={documentSearchQuery}
-                      onChange={(event) => setDocumentSearchQuery(event.target.value)}
-                      placeholder="Ask this document a question"
+                      onChange={(event) =>
+                        setDocumentSearchQuery(event.target.value)
+                      }
+                      placeholder='Ask this document a question'
                       autoFocus
                     />
                     <button
-                      className="icon-button modal-search-button"
-                      type="submit"
+                      className='icon-button modal-search-button'
+                      type='submit'
                       disabled={searchingDocument}
-                      aria-label="Search document"
+                      aria-label='Search document'
                     >
-                      <img src={searchIcon} alt="" />
+                      <img src={searchIcon} alt='' />
                     </button>
                   </>
                 ) : (
                   <button
-                    className="icon-button modal-search-trigger"
-                    type="button"
+                    className='icon-button modal-search-trigger'
+                    type='button'
                     onClick={() => setSearchOpen(true)}
-                    aria-label="Open document search"
+                    aria-label='Open document search'
                   >
-                    <img src={searchIcon} alt="" />
+                    <img src={searchIcon} alt='' />
                   </button>
                 )}
               </form>
 
-              <div className="field-tabs">
+              <div className='field-tabs'>
                 {selectedDocument.fields.map((field) => (
                   <button
                     key={field.id}
-                    type="button"
+                    type='button'
                     className={
                       field.id === selectedFieldId && !documentSearchResult
                         ? 'field-tab field-tab-active'
@@ -494,17 +569,18 @@ export default function App() {
               </div>
             </div>
 
-            <div className="field-viewer field-viewer-modal">
+            <div className='field-viewer field-viewer-modal'>
               {documentSearchResult ? (
                 <>
                   <h4>Answer</h4>
-                  <div className="answer-card">
-                    <p className="answer-text">
+                  <div className='answer-card'>
+                    <p className='answer-text'>
                       {documentSearchResult.text || 'No answer found.'}
                     </p>
                     {typeof documentSearchResult.score === 'number' ? (
-                      <span className="answer-score">
-                        Confidence {(documentSearchResult.score * 100).toFixed(1)}%
+                      <span className='answer-score'>
+                        Confidence{' '}
+                        {(documentSearchResult.score * 100).toFixed(1)}%
                       </span>
                     ) : null}
                   </div>
@@ -515,7 +591,7 @@ export default function App() {
                   {renderFieldValue(activeField.value)}
                 </>
               ) : (
-                <p className="placeholder">No field data available.</p>
+                <p className='placeholder'>No field data available.</p>
               )}
             </div>
           </section>
