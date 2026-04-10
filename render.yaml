@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: |
       python -m pip install -r requirements.txt
-      npm ci
+      npm ci --include=dev
       npm run build
     startCommand: python -m uvicorn server.app:app --host 0.0.0.0 --port $PORT
     envVars:
