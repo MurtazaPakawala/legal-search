@@ -38,6 +38,10 @@ class RerankRequest(BaseModel):
     query: str
 
 
+class DocumentSearchRequest(BaseModel):
+    query: str
+
+
 def to_document_summary(document: dict) -> dict:
     return {
         "id": document["id"],
@@ -236,6 +240,40 @@ async def get_document(document_id: str) -> dict:
     return {
         "document": to_document_summary(document),
         "fields": build_document_fields(document),
+    }
+
+
+@app.post("/api/documents/{document_id}/search")
+async def search_document(document_id: str, payload: DocumentSearchRequest) -> dict:
+    document = find_document(document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    query = payload.query.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Search query is required.")
+
+    if not client:
+        raise HTTPException(
+            status_code=500,
+            detail="ISAACUS_API_KEY is missing. Add it to a local .env file before calling the API.",
+        )
+
+    response = client.extractions.qa.create(
+        model="kanon-answer-extractor",
+        query=query,
+        texts=[document["text"]],
+    )
+
+    extraction = response.extractions[0] if response.extractions else None
+    answer = extraction.answers[0] if extraction and extraction.answers else None
+
+    return {
+        "query": query,
+        "answer": {
+            "text": answer.text if answer else None,
+            "score": answer.score if answer else None,
+        },
     }
 
 

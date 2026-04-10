@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import deleteIcon from './assets/delete.svg';
 import documentIcon from './assets/document.svg';
 import linkIcon from './assets/link-svgrepo-com.svg';
+import searchIcon from './assets/search-alt-svgrepo-com.svg';
 
 export default function App() {
   const [query, setQuery] = useState('');
@@ -15,6 +16,10 @@ export default function App() {
   const [detailsError, setDetailsError] = useState('');
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedFieldId, setSelectedFieldId] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [documentSearchQuery, setDocumentSearchQuery] = useState('');
+  const [documentSearchResult, setDocumentSearchResult] = useState(null);
+  const [searchingDocument, setSearchingDocument] = useState(false);
   const [documentForm, setDocumentForm] = useState({
     title: '',
     sourceUrl: '',
@@ -59,6 +64,9 @@ export default function App() {
         fields: availableFields,
       });
       setSelectedFieldId(availableFields[0]?.id || '');
+      setSearchOpen(false);
+      setDocumentSearchQuery('');
+      setDocumentSearchResult(null);
     } catch (requestError) {
       setDetailsError(
         requestError instanceof Error
@@ -161,6 +169,11 @@ export default function App() {
         currentDocument?.id === documentId ? null : currentDocument,
       );
       setSelectedFieldId((currentFieldId) => (wasSelected ? '' : currentFieldId));
+      if (wasSelected) {
+        setSearchOpen(false);
+        setDocumentSearchQuery('');
+        setDocumentSearchResult(null);
+      }
       setStatus((currentStatus) => ({
         ...currentStatus,
         documentCount: Math.max((currentStatus.documentCount || 1) - 1, 0),
@@ -185,6 +198,44 @@ export default function App() {
     return (
       <pre className="field-pre">{JSON.stringify(value, null, 2)}</pre>
     );
+  }
+
+  async function handleDocumentSearch(event) {
+    event.preventDefault();
+
+    if (!selectedDocument || !documentSearchQuery.trim()) {
+      return;
+    }
+
+    setSearchingDocument(true);
+    setDetailsError('');
+
+    try {
+      const response = await fetch(`/api/documents/${selectedDocument.id}/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: documentSearchQuery }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.detail || 'Unable to search document.');
+      }
+
+      setDocumentSearchResult(data.answer);
+    } catch (requestError) {
+      setDetailsError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to search document.',
+      );
+      setDocumentSearchResult(null);
+    } finally {
+      setSearchingDocument(false);
+    }
   }
 
   return (
@@ -355,7 +406,12 @@ export default function App() {
       {selectedDocument ? (
         <div
           className="modal-backdrop"
-          onClick={() => setSelectedDocument(null)}
+          onClick={() => {
+            setSelectedDocument(null);
+            setSearchOpen(false);
+            setDocumentSearchQuery('');
+            setDocumentSearchResult(null);
+          }}
           role="presentation"
         >
           <section
@@ -373,32 +429,87 @@ export default function App() {
               <button
                 className="modal-close"
                 type="button"
-                onClick={() => setSelectedDocument(null)}
+                onClick={() => {
+                  setSelectedDocument(null);
+                  setSearchOpen(false);
+                  setDocumentSearchQuery('');
+                  setDocumentSearchResult(null);
+                }}
                 aria-label="Close document details"
               >
                 Close
               </button>
             </div>
 
-            <div className="field-tabs">
-              {selectedDocument.fields.map((field) => (
-                <button
-                  key={field.id}
-                  type="button"
-                  className={
-                    field.id === selectedFieldId
-                      ? 'field-tab field-tab-active'
-                      : 'field-tab'
-                  }
-                  onClick={() => setSelectedFieldId(field.id)}
-                >
-                  {field.label}
-                </button>
-              ))}
+            <div className="modal-toolbar">
+              <form className="modal-search" onSubmit={handleDocumentSearch}>
+                {searchOpen ? (
+                  <>
+                    <input
+                      className="modal-search-input"
+                      value={documentSearchQuery}
+                      onChange={(event) => setDocumentSearchQuery(event.target.value)}
+                      placeholder="Ask this document a question"
+                      autoFocus
+                    />
+                    <button
+                      className="icon-button modal-search-button"
+                      type="submit"
+                      disabled={searchingDocument}
+                      aria-label="Search document"
+                    >
+                      <img src={searchIcon} alt="" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="icon-button modal-search-trigger"
+                    type="button"
+                    onClick={() => setSearchOpen(true)}
+                    aria-label="Open document search"
+                  >
+                    <img src={searchIcon} alt="" />
+                  </button>
+                )}
+              </form>
+
+              <div className="field-tabs">
+                {selectedDocument.fields.map((field) => (
+                  <button
+                    key={field.id}
+                    type="button"
+                    className={
+                      field.id === selectedFieldId && !documentSearchResult
+                        ? 'field-tab field-tab-active'
+                        : 'field-tab'
+                    }
+                    onClick={() => {
+                      setSelectedFieldId(field.id);
+                      setDocumentSearchResult(null);
+                    }}
+                  >
+                    {field.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="field-viewer field-viewer-modal">
-              {activeField ? (
+              {documentSearchResult ? (
+                <>
+                  <h4>Answer</h4>
+                  <div className="answer-card">
+                    <p className="answer-text">
+                      {documentSearchResult.text || 'No answer found.'}
+                    </p>
+                    {typeof documentSearchResult.score === 'number' ? (
+                      <span className="answer-score">
+                        Confidence {(documentSearchResult.score * 100).toFixed(1)}%
+                      </span>
+                    ) : null}
+                  </div>
+                </>
+              ) : activeField ? (
                 <>
                   <h4>{activeField.label}</h4>
                   {renderFieldValue(activeField.value)}
