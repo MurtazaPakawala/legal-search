@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import linkIcon from './assets/link-svgrepo-com.svg';
 
 export default function App() {
   const [query, setQuery] = useState('');
@@ -152,7 +153,20 @@ export default function App() {
               results.map((result) => (
                 <article className="result-card" key={result.id}>
                   <div className="result-head">
-                    <h2>{result.title}</h2>
+                    <div className="result-title-row">
+                      <h2>{result.title}</h2>
+                      {result.sourceUrl ? (
+                        <a
+                          className="icon-link"
+                          href={result.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Open ${result.title}`}
+                        >
+                          <img src={linkIcon} alt="" />
+                        </a>
+                      ) : null}
+                    </div>
                     <strong>{(result.score * 100).toFixed(1)}%</strong>
                   </div>
                   <div className="bar-track">
@@ -161,12 +175,6 @@ export default function App() {
                       style={{ width: `${Math.max(result.score * 100, 4)}%` }}
                     />
                   </div>
-                  {result.sourceUrl ? (
-                    <a href={result.sourceUrl} target="_blank" rel="noreferrer">
-                      {result.sourceUrl}
-                    </a>
-                  ) : null}
-                  <p>{result.text}</p>
                 </article>
               ))
             )}
@@ -219,14 +227,22 @@ export default function App() {
             ) : (
               documents.map((document) => (
                 <article className="document-item" key={document.id}>
-                  <h3>{document.title}</h3>
-                  {document.sourceUrl ? (
-                    <a href={document.sourceUrl} target="_blank" rel="noreferrer">
-                      {document.sourceUrl}
-                    </a>
-                  ) : (
-                    <span className="document-link-muted">Built in</span>
-                  )}
+                  <div className="document-row">
+                    <h3>{document.title}</h3>
+                    {document.sourceUrl ? (
+                      <a
+                        className="icon-link"
+                        href={document.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Open ${document.title}`}
+                      >
+                        <img src={linkIcon} alt="" />
+                      </a>
+                    ) : (
+                      <span className="document-link-muted">Built in</span>
+                    )}
+                  </div>
                 </article>
               ))
             )}

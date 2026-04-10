@@ -108,24 +108,38 @@ h1 {
 }
 
 .document-item h3 {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 1rem;
 }
 
-.document-item a,
-.result-card a {
-  display: inline-block;
-  max-width: 100%;
-  color: #8a5610;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.document-row,
+.result-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .document-link-muted {
   display: inline-block;
   color: rgba(16, 32, 51, 0.6);
   font-size: 0.9rem;
+}
+
+.icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(16, 32, 51, 0.08);
+  flex: 0 0 auto;
+}
+
+.icon-link img {
+  width: 16px;
+  height: 16px;
 }
 
 .main-panel {
@@ -239,7 +253,7 @@ h1 {
 .bar-track {
   overflow: hidden;
   height: 12px;
-  margin: 12px 0 14px;
+  margin: 12px 0 0;
   border-radius: 999px;
   background: rgba(16, 32, 51, 0.08);
 }
@@ -275,5 +289,9 @@ h1 {
   .result-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .result-title-row {
+    width: 100%;
   }
 }
