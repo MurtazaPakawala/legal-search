@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import deleteIcon from './assets/delete.svg';
 import linkIcon from './assets/link-svgrepo-com.svg';
 
 export default function App() {
@@ -54,7 +55,7 @@ export default function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Request failed.');
+        throw new Error(data.error || data.detail || 'Request failed.');
       }
 
       setResults(data.results);
@@ -85,7 +86,7 @@ export default function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Unable to add document.');
+        throw new Error(data.error || data.detail || 'Unable to add document.');
       }
 
       setDocumentForm({ title: '', sourceUrl: '' });
@@ -105,11 +106,43 @@ export default function App() {
     }
   }
 
+  async function handleDeleteDocument(documentId) {
+    setDocumentError('');
+
+    try {
+      const response = await fetch(`/api/documents/${documentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || data.detail || 'Unable to delete document.');
+      }
+
+      setDocuments((currentDocuments) =>
+        currentDocuments.filter((document) => document.id !== documentId),
+      );
+      setResults((currentResults) =>
+        currentResults.filter((result) => result.id !== documentId),
+      );
+      setStatus((currentStatus) => ({
+        ...currentStatus,
+        documentCount: Math.max((currentStatus.documentCount || 1) - 1, 0),
+      }));
+    } catch (requestError) {
+      setDocumentError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to delete document.',
+      );
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="hero">
         <p className="eyebrow">Isaacus + React</p>
-        <h1>Minimal legal search demo</h1>
+        <h1>Legal Search (Demo)</h1>
         <p className="intro">
           Add document links, review the current file list, then send a legal-style
           query to the backend and visualize how Isaacus reranks the indexed text.
@@ -230,15 +263,25 @@ export default function App() {
                   <div className="document-row">
                     <h3>{document.title}</h3>
                     {document.sourceUrl ? (
-                      <a
-                        className="icon-link"
-                        href={document.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`Open ${document.title}`}
-                      >
-                        <img src={linkIcon} alt="" />
-                      </a>
+                      <div className="document-actions">
+                        <a
+                          className="icon-link"
+                          href={document.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Open ${document.title}`}
+                        >
+                          <img src={linkIcon} alt="" />
+                        </a>
+                        <button
+                          className="icon-button icon-button-delete"
+                          type="button"
+                          onClick={() => handleDeleteDocument(document.id)}
+                          aria-label={`Delete ${document.title}`}
+                        >
+                          <img src={deleteIcon} alt="" />
+                        </button>
+                      </div>
                     ) : (
                       <span className="document-link-muted">Built in</span>
                     )}

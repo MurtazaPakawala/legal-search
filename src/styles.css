@@ -42,9 +42,9 @@ input {
 
 h1 {
   margin: 0;
-  font-size: clamp(2.4rem, 5vw, 4.2rem);
-  line-height: 0.95;
-  max-width: 10ch;
+  font-size: clamp(2.2rem, 4.8vw, 3.8rem);
+  line-height: 1.05;
+  max-width: none;
 }
 
 .intro {
@@ -120,13 +120,20 @@ h1 {
   gap: 12px;
 }
 
+.document-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .document-link-muted {
   display: inline-block;
   color: rgba(16, 32, 51, 0.6);
   font-size: 0.9rem;
 }
 
-.icon-link {
+.icon-link,
+.icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -137,7 +144,17 @@ h1 {
   flex: 0 0 auto;
 }
 
-.icon-link img {
+.icon-button {
+  border: 0;
+  cursor: pointer;
+}
+
+.icon-button-delete {
+  background: rgba(167, 48, 48, 0.12);
+}
+
+.icon-link img,
+.icon-button img {
   width: 16px;
   height: 16px;
 }
