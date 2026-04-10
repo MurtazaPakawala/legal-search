@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
 
-const defaultQuery = 'Find the clause about confidentiality obligations.';
-
 export default function App() {
-  const [query, setQuery] = useState(defaultQuery);
+  const [query, setQuery] = useState('');
   const [status, setStatus] = useState({ ok: false, hasApiKey: false });
+  const [documents, setDocuments] = useState([]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [addingDocument, setAddingDocument] = useState(false);
   const [error, setError] = useState('');
+  const [documentError, setDocumentError] = useState('');
+  const [documentForm, setDocumentForm] = useState({
+    title: '',
+    sourceUrl: '',
+  });
 
   useEffect(() => {
     fetch('/api/health')
@@ -16,7 +21,20 @@ export default function App() {
       .catch(() => {
         setStatus({ ok: false, hasApiKey: false });
       });
+
+    fetch('/api/documents')
+      .then((response) => response.json())
+      .then((data) => setDocuments(data.documents || []))
+      .catch(() => {
+        setDocuments([]);
+      });
   }, []);
+
+  async function refreshDocuments() {
+    const response = await fetch('/api/documents');
+    const data = await response.json();
+    setDocuments(data.documents || []);
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -49,66 +67,171 @@ export default function App() {
     }
   }
 
+  async function handleAddDocument(event) {
+    event.preventDefault();
+    setAddingDocument(true);
+    setDocumentError('');
+
+    try {
+      const response = await fetch('/api/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(documentForm),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to add document.');
+      }
+
+      setDocumentForm({ title: '', sourceUrl: '' });
+      await refreshDocuments();
+      setStatus((currentStatus) => ({
+        ...currentStatus,
+        documentCount: (currentStatus.documentCount || 0) + 1,
+      }));
+    } catch (requestError) {
+      setDocumentError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to add document.',
+      );
+    } finally {
+      setAddingDocument(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="hero">
         <p className="eyebrow">Isaacus + React</p>
         <h1>Minimal legal search demo</h1>
         <p className="intro">
-          Type a legal-style question, send it to the backend, and visualize how
-          Isaacus reranks a tiny set of sample clauses.
+          Add document links, review the current file list, then send a legal-style
+          query to the backend and visualize how Isaacus reranks the indexed text.
         </p>
       </section>
 
-      <section className="panel">
-        <form className="query-form" onSubmit={handleSubmit}>
-          <label htmlFor="query">Query</label>
-          <textarea
-            id="query"
-            rows="4"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Describe what you want to find in the documents"
-          />
-          <button type="submit" disabled={loading}>
-            {loading ? 'Ranking...' : 'Run reranking'}
-          </button>
-        </form>
+      <section className="workspace">
+        <section className="panel main-panel">
+          <form className="query-form" onSubmit={handleSubmit}>
+            <label htmlFor="query">Query</label>
+            <textarea
+              id="query"
+              rows="4"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Describe what you want to find in the documents"
+            />
+            <button type="submit" disabled={loading}>
+              {loading ? 'Ranking...' : 'Run reranking'}
+            </button>
+          </form>
 
-        <div className="status-row">
-          <span className={status.ok ? 'pill pill-live' : 'pill'}>
-            Backend: {status.ok ? 'online' : 'offline'}
-          </span>
-          <span className={status.hasApiKey ? 'pill pill-live' : 'pill pill-warn'}>
-            API key: {status.hasApiKey ? 'configured' : 'missing'}
-          </span>
-        </div>
+          <div className="status-row">
+            <span className={status.ok ? 'pill pill-live' : 'pill'}>
+              Backend: {status.ok ? 'online' : 'offline'}
+            </span>
+            <span className={status.hasApiKey ? 'pill pill-live' : 'pill pill-warn'}>
+              API key: {status.hasApiKey ? 'configured' : 'missing'}
+            </span>
+            <span className="pill">Docs: {documents.length}</span>
+          </div>
 
-        {error ? <p className="error-box">{error}</p> : null}
+          {error ? <p className="error-box">{error}</p> : null}
 
-        <div className="results">
-          {results.length === 0 ? (
-            <p className="placeholder">
-              Run the demo to see ranked clauses and their scores.
-            </p>
-          ) : (
-            results.map((result) => (
-              <article className="result-card" key={result.id}>
-                <div className="result-head">
-                  <h2>{result.title}</h2>
-                  <strong>{(result.score * 100).toFixed(1)}%</strong>
-                </div>
-                <div className="bar-track">
-                  <div
-                    className="bar-fill"
-                    style={{ width: `${Math.max(result.score * 100, 4)}%` }}
-                  />
-                </div>
-                <p>{result.text}</p>
-              </article>
-            ))
-          )}
-        </div>
+          <div className="results">
+            {results.length === 0 ? (
+              <p className="placeholder">
+                Run the demo to see ranked documents and their scores.
+              </p>
+            ) : (
+              results.map((result) => (
+                <article className="result-card" key={result.id}>
+                  <div className="result-head">
+                    <h2>{result.title}</h2>
+                    <strong>{(result.score * 100).toFixed(1)}%</strong>
+                  </div>
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill"
+                      style={{ width: `${Math.max(result.score * 100, 4)}%` }}
+                    />
+                  </div>
+                  {result.sourceUrl ? (
+                    <a href={result.sourceUrl} target="_blank" rel="noreferrer">
+                      {result.sourceUrl}
+                    </a>
+                  ) : null}
+                  <p>{result.text}</p>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+
+        <aside className="sidebar panel">
+          <form className="link-form" onSubmit={handleAddDocument}>
+            <div className="sidebar-head">
+              <h2>Files</h2>
+              <span className="file-count">{documents.length}</span>
+            </div>
+
+            <input
+              id="title"
+              value={documentForm.title}
+              onChange={(event) =>
+                setDocumentForm((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+              placeholder="Optional title"
+            />
+
+            <input
+              id="sourceUrl"
+              type="url"
+              value={documentForm.sourceUrl}
+              onChange={(event) =>
+                setDocumentForm((current) => ({
+                  ...current,
+                  sourceUrl: event.target.value,
+                }))
+              }
+              placeholder="Paste file link"
+              required
+            />
+
+            <button type="submit" disabled={addingDocument}>
+              {addingDocument ? 'Adding...' : 'Add file'}
+            </button>
+          </form>
+
+          {documentError ? <p className="error-box">{documentError}</p> : null}
+
+          <div className="document-list">
+            {documents.length === 0 ? (
+              <p className="placeholder">No files yet.</p>
+            ) : (
+              documents.map((document) => (
+                <article className="document-item" key={document.id}>
+                  <h3>{document.title}</h3>
+                  {document.sourceUrl ? (
+                    <a href={document.sourceUrl} target="_blank" rel="noreferrer">
+                      {document.sourceUrl}
+                    </a>
+                  ) : (
+                    <span className="document-link-muted">Built in</span>
+                  )}
+                </article>
+              ))
+            )}
+          </div>
+        </aside>
       </section>
     </main>
   );

@@ -48,7 +48,6 @@ function toDocumentSummary(document) {
     id: document.id,
     title: document.title,
     sourceUrl: document.sourceUrl,
-    preview: document.text.slice(0, 180),
   };
 }
 
@@ -75,6 +74,11 @@ function normalizeText(value) {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+function looksLikePlainText(body) {
+  const sample = body.slice(0, 500);
+  return !/<html[\s>]/i.test(sample) && /[A-Za-z0-9]/.test(sample);
+}
+
 async function fetchDocumentText(sourceUrl) {
   const response = await fetch(sourceUrl);
 
@@ -84,6 +88,7 @@ async function fetchDocumentText(sourceUrl) {
 
   const contentType = response.headers.get('content-type') || '';
   const body = await response.text();
+  const pathname = new URL(sourceUrl).pathname.toLowerCase();
 
   if (contentType.includes('text/html')) {
     return normalizeText(stripHtml(body));
@@ -91,9 +96,20 @@ async function fetchDocumentText(sourceUrl) {
 
   if (
     contentType.includes('text/plain') ||
+    contentType.includes('text/markdown') ||
     contentType.includes('application/json') ||
     contentType.includes('application/xml') ||
     contentType.includes('text/xml')
+  ) {
+    return normalizeText(body);
+  }
+
+  if (
+    pathname.endsWith('.md') ||
+    pathname.endsWith('.txt') ||
+    pathname.endsWith('.json') ||
+    pathname.endsWith('.xml') ||
+    looksLikePlainText(body)
   ) {
     return normalizeText(body);
   }
