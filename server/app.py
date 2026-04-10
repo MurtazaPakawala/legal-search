@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import asyncio
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -30,6 +31,7 @@ app.add_middleware(
 )
 
 documents: list[dict] = []
+documents_lock = asyncio.Lock()
 
 DEFAULT_DOCUMENTS = [
     {
@@ -270,21 +272,25 @@ async def enrich_document_text(text: str) -> dict:
 
 
 async def ensure_default_documents() -> None:
-    if documents:
-        return
+    async with documents_lock:
+        existing_ids = {document["id"] for document in documents}
 
-    for item in DEFAULT_DOCUMENTS:
-        text = await fetch_document_text(item["sourceUrl"])
-        enrichment = await enrich_document_text(text)
-        documents.append(
-            build_document_record(
-                document_id=item["id"],
-                title=item["title"],
-                source_url=item["sourceUrl"],
-                text=text,
-                enrichment=enrichment,
+        for item in DEFAULT_DOCUMENTS:
+            if item["id"] in existing_ids:
+                continue
+
+            text = await fetch_document_text(item["sourceUrl"])
+            enrichment = await enrich_document_text(text)
+            documents.append(
+                build_document_record(
+                    document_id=item["id"],
+                    title=item["title"],
+                    source_url=item["sourceUrl"],
+                    text=text,
+                    enrichment=enrichment,
+                )
             )
-        )
+            existing_ids.add(item["id"])
 
 
 @app.get("/api/health")
