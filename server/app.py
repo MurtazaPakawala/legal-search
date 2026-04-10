@@ -1,18 +1,24 @@
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from starlette.staticfiles import StaticFiles
 
 from isaacus import Isaacus
 
 load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DIST_DIR = BASE_DIR / "dist"
 
 app = FastAPI()
 app.add_middleware(
@@ -439,3 +445,19 @@ async def rerank_documents(payload: RerankRequest) -> dict:
         "model": "kanon-2-reranker",
         "results": results,
     }
+
+
+if (DIST_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_frontend(full_path: str) -> FileResponse:
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found.")
+
+    index_file = DIST_DIR / "index.html"
+    if not index_file.exists():
+        raise HTTPException(status_code=404, detail="Frontend build not found.")
+
+    return FileResponse(index_file)
